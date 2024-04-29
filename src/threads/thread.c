@@ -177,6 +177,7 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
   tid = t->tid = allocate_tid();
+ // remove the thread which reach the wakeup form list
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame(t, sizeof *kf);
@@ -560,6 +561,15 @@ allocate_tid(void)
 
   return tid;
 }
+
+bool     //comparison function used for ordering threads in the sleep_list based on their wakeup time
+thread_wakeup_less(struct list_elem *a_,struct list_elem *b_, void *aux)
+{
+   struct thread *a = list_entry(a_, struct thread, elem);
+   struct thread *b = list_entry(b_, struct thread, elem);
+  return a->wakeup_ticks < b->wakeup_ticks;
+}
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
