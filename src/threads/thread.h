@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "fixed_point.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -92,6 +94,9 @@ struct thread
    struct list locks;         // For locks the thread holds
    struct list_elem allelem;  /* List element for all threads list. */
 
+   // added by Hager Melook
+   int nice;
+   real recent_cpu;
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
    int64_t wakeup_ticks;  // time to wakeup by ALI HASSAN
@@ -121,7 +126,6 @@ tid_t thread_create(const char *name, int priority, thread_func *, void *);
 
 void thread_block(void);
 void thread_unblock(struct thread *);
-
 struct thread *thread_current(void);
 tid_t thread_tid(void);
 const char *thread_name(void);
@@ -141,6 +145,13 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
+// added by Hager Melook
+void calculate_priority(struct thread *t,void *aux);
+void calculate_recent_cpu(struct thread *t,void *aux);
+void calculate_recent_cpu_threads(void);
+bool test_not_idle(struct thread *current);
+void calculate_priority_threads(void);
+void calculate_avg_load(void);
 
 bool thread_wakeup_less(struct list_elem *a_,struct list_elem *b_, void *aux); //by ALI HASSAN
 

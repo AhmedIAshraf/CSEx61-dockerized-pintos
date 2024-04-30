@@ -7,7 +7,9 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+
+#include "threads/fixed_point.h"
+
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -96,7 +98,6 @@ timer_sleep (int64_t ticks)
   // Disable interrupts to prevent race conditions
   enum intr_level old_level = intr_disable();
   int64_t start = timer_ticks ();
-
   // Insert the thread into a list ordered by wakeup time
   struct thread *cur = thread_current();
   cur->wakeup_ticks = start+ticks;
@@ -193,7 +194,19 @@ timer_interrupt (struct intr_frame *args UNUSED)
     list_remove(head);   // remove the thread which reach the wakeup form list
     thread_unblock(t);
     intr_set_level(old_level);
- 
+  }
+    // added by Hager Melook
+  if(thread_mlfqs){
+        struct thread *current=thread_current();
+        if(test_not_idle(current)&&current->status==THREAD_RUNNING) current->recent_cpu=ADD_FP_INT(current->recent_cpu,1);
+        if(ticks %TIMER_FREQ==0){
+          calculate_avg_load();
+          calculate_recent_cpu_threads();
+          //thread_foreach(calculate_recent_cpu,NULL);
+        }
+        if(ticks%4==0){
+          calculate_priority_threads();
+        }
   }
 }
 
