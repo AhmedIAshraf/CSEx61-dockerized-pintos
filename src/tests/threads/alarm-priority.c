@@ -35,7 +35,6 @@ void test_alarm_priority(void)
 
   for (i = 0; i < 10; i++)
   {
-    printf("\n\n\nEnding Test\n");
     sema_down(&wait_sema);
   }
 }
