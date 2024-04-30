@@ -1,6 +1,9 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
+#define list_entry(LIST_ELEM, STRUCT, MEMBER) \
+  ((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
+
 #include <list.h>
 #include <stdbool.h>
 
@@ -22,6 +25,7 @@ struct lock
 {
   struct thread *holder; /* Thread holding lock (for debugging). */
   int largestPri;
+  struct list_elem elem;
   struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 

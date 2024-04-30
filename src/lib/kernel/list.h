@@ -187,15 +187,15 @@ struct list_elem *list_min(struct list *, list_less_func *, void *aux);
 /*
 When a thread waits on the lock
 --------------------------------
-- update the list of threads waiting on the lock (Done)
+// - update the list of threads waiting on the lock (Done)
 - Highest pri to be the holder's effective (Set the att of the lock and set the holder's) [iteration on the list]
         the donation operation (nested + multiple)
-- if the thread is the holder, add the lock to the list of locks in the thread
+// - if the thread is the holder, add the lock to the list of locks in the thread
 - schedlueing + function choose the highest pri
 
 When Thread releases the lock
 ------------------------------
-- remove the lock from the list
+// - remove the lock from the list
 - thread get the next highest pri from the its list
 
 Adjust cinditions & semaphores
