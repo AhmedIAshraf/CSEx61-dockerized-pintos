@@ -41,9 +41,14 @@
 
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
+
 static bool thread_max_priority(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux UNUSED);
+
+static bool locks_max_priority(const struct list_elem *a,
+                               const struct list_elem *b,
+                               void *aux UNUSED);
 
 static bool
 thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
@@ -54,12 +59,8 @@ thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *
   const struct thread *t1 = list_entry(a, struct thread, elem);
   const struct thread *t2 = list_entry(b, struct thread, elem);
 
-  return t1->priority > t2->priority;
+  return t1->priority >= t2->priority;
 }
-
-static bool locks_max_priority(const struct list_elem *a,
-                               const struct list_elem *b,
-                               void *aux UNUSED);
 
 static bool
 locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
@@ -69,8 +70,7 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
 
   const struct lock *l1 = list_entry(a, struct lock, elem);
   const struct lock *l2 = list_entry(b, struct lock, elem);
-
-  return l1->largestPri > l2->largestPri;
+  return l1->largestPri >= l2->largestPri;
 }
 
 void sema_init(struct semaphore *sema, unsigned value)
@@ -90,23 +90,22 @@ void sema_init(struct semaphore *sema, unsigned value)
    thread will probably turn interrupts back on. */
 void sema_down(struct semaphore *sema)
 {
-  printf("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  // printf("Enter sema with %s\n", thread_current()->name);
   enum intr_level old_level;
-
   ASSERT(sema != NULL);
   ASSERT(!intr_context());
 
   old_level = intr_disable();
-  // printf("%d\n", sema->value);
+  // printf("sema val %d\n", sema->value);
+  // printf("name of th %s\n", thread_current()->name);
   while (sema->value == 0)
   {
-    printf("cccccccccccccccccccccccccccccccccccccc\n");
-    list_push_back(&sema->waiters, &thread_current()->elem);
+    // printf("loop\n");
+    list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL);
     thread_block();
   }
   sema->value--;
   intr_set_level(old_level);
-  printf("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 }
 
 /* Down or "P" operation on a semaphore, but only if the
@@ -206,9 +205,10 @@ sema_test_helper(void *sema_)
 void lock_init(struct lock *lock)
 {
   ASSERT(lock != NULL);
-  // lock->largestPri = 0;
+
   lock->holder = NULL;
   sema_init(&lock->semaphore, 1);
+  lock->largestPri = 0;
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -221,35 +221,46 @@ void lock_init(struct lock *lock)
    we need to sleep. */
 void lock_acquire(struct lock *lock)
 {
-  printf("acccccccccccqqqqqqqqqqqqqqqqqqquire");
+
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
   ASSERT(!lock_held_by_current_thread(lock));
 
-  // thread_current()->waitingOn = lock;
-  // if (thread_current()->effictivePri > lock->largestPri)
-  // {
-  //   struct lock *currentLock = lock;
-  //   while (currentLock != NULL)
-  //   {
-  //     if (thread_current()->effictivePri > currentLock->largestPri)
-  //     {
-  //       currentLock->largestPri = thread_current()->effictivePri;
-  //       currentLock->holder->effictivePri = thread_current()->effictivePri;
-  //     }
-  //     currentLock = &currentLock->holder->waitingOn;
-  //   }
-  // }
+  thread_current()->waitingOn = lock;
 
+  struct lock *currentLock = lock;
+  struct thread *lockHolder = lock->holder;
+  while (lockHolder != NULL && thread_current()->effictivePri > lockHolder->effictivePri)
+  {
+    printf("Entered Aqcuire\n");
+    printf("thread_current %s\n", thread_current()->name);
+    printf("holder %s\n", lockHolder->name);
+    printf("holder before %d\n", lockHolder->effictivePri);
+    lockHolder->effictivePri = thread_current()->effictivePri;
+    printf("holder after %d\n", lockHolder->effictivePri);
+    if (currentLock->largestPri < thread_current()->effictivePri)
+    {
+      currentLock->largestPri = thread_current()->effictivePri;
+      // thread_current()->effictivePri = thread_current()->effictivePri;
+    }
+    currentLock = lockHolder->waitingOn;
+    if (currentLock == NULL)
+    {
+      printf("Acuire1 ended his loop\n");
+      break;
+    }
+    lockHolder = currentLock->holder;
+    printf("is null %d\n", lockHolder == NULL);
+  }
   sema_down(&lock->semaphore);
-  // thread_current()->waitingOn = NULL;
+  thread_current()->waitingOn = NULL;
   lock->holder = thread_current();
-  // lock->largestPri = thread_current()->effictivePri;
-  // list_insert_ordered(&thread_current()->locks, &lock->elem, locks_max_priority, NULL);
+  lock->largestPri = thread_current()->effictivePri;
 
-  // struct list_elem *e = list_pop_back(&thread_current()->locks);
-  // struct lock *a = list_entry(e, struct lock, elem);
-  // printf("\n%d\n", a->largestPri);
+  // ---------------Problem----------------
+  list_insert_ordered(&thread_current()->locks, &lock->elem, locks_max_priority, NULL);
+  // list_push_back(&thread_current()->locks, &lock->elem);
+  //--------------------------------------------------------
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -281,15 +292,15 @@ void lock_release(struct lock *lock)
   ASSERT(lock != NULL);
   ASSERT(lock_held_by_current_thread(lock));
 
-  // list_remove(&lock->elem);
-  // thread_current()->effictivePri = thread_current()->priority;
-  // thread_current()->effictivePri = thread_current()->priority;
-  // struct list_elem *a;
-  // for (a = list_begin(&thread_current()->locks);
+  // -------------------Problem----------------------------------
+  list_remove(&lock->elem);
+  // printf("Priority %d\n", thread_current()->effictivePri);
+  thread_current()->effictivePri = thread_current()->priority;
+  // printf("Priority %d\n", thread_current()->priority);
+  // -------------------------------------------------------------
 
   lock->holder = NULL;
   sema_up(&lock->semaphore);
-  printf("\nPPPPPPPPPPPPPPPPPAAAAAAAAAAAAAASSSSSSSSSSSTTTTTTTTRELEAAASE\n");
 }
 
 /* Returns true if the current thread holds LOCK, false
