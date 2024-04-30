@@ -225,53 +225,12 @@ tid_t thread_create(const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  // struct list_elem *e;
-  // for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
-  // {
-  //   struct thread *t = list_entry(e, struct thread, allelem);
-  //   printf("Additional thread null ? %d with name = %s and pri = %d\n", t == NULL, t->name, t->priority);
-  //   // printf(t->name);
-  // }
-  // printf("Now Ready of Those\n");
-  // for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
-  // {
-  //   struct thread *t = list_entry(e, struct thread, allelem);
-  //   printf("Additional thread null ? %d with name = %s and pri = %d\n", t == NULL, t->name, t->priority);
-  //   // printf(t->name);
-  // }
-
   /* Add to run queue. */
   thread_unblock(t);
 
-  printf("All threads : \n");
-  struct list_elem *e;
-  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
-  {
-    struct thread *t = list_entry(e, struct thread, allelem);
-    printf("Additional thread null ? %d with name = %s and pri = %d\n", t == NULL, t->name, t->priority);
-  }
-  printf("Ready Onle threads : \n");
-  struct list_elem *a;
-  for (a = list_begin(&ready_list); a != list_end(&ready_list); a = list_next(e))
-  {
-    struct thread *t = list_entry(a, struct thread, elem);
-    printf("name = %s and pri = %d\n", t->name, t->effictivePri);
-  }
-
   if (priority > thread_current()->priority)
     thread_yield();
-  // printf("Unblock happened \n");
-  // printf("Name of runnig one : %s \n", running_thread()->name);
 
-  // // for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
-  // // {
-  // //   struct thread *t = list_entry(e, struct thread, allelem);
-  // //   printf("Additional thread null ? %d with name = %s and pri = %d\n", t == NULL, t->name, t->priority);
-  // //   // printf(t->name);
-  // // }
-  // // printf("Now Ready of Those\n");
-  // // thread_yield();
-  // // schedule();
   return tid;
 }
 
@@ -286,19 +245,6 @@ void thread_block(void)
   ASSERT(!intr_context());
   ASSERT(intr_get_level() == INTR_OFF);
   thread_current()->status = THREAD_BLOCKED;
-  // printf("supposed to print\n");
-  // printf("name of th %s,\n", thread_current()->name);
-  // struct thread *t = thread_current();
-  // t->status = THREAD_BLOCKED;
-
-  // struct list_elem *e;
-  // for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
-  // {
-  //   struct thread *t = list_entry(e, struct thread, elem);
-  //   printf("name = %s and pri = %d\n", t->name, t->effictivePri);
-  // }
-
-  // printf("supposed to print\n");
   schedule();
 }
 
@@ -312,29 +258,24 @@ void thread_block(void)
    update other data. */
 void thread_unblock(struct thread *t)
 {
-  // printf("Inside the unblock, the thread to be inserted its name is : %s \n", t->name);
   enum intr_level old_level;
 
   ASSERT(is_thread(t));
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  // printf("Length of ready [[[before]]] : %d \n", list_size(&ready_list));
 
-  list_insert_ordered(&ready_list, &t->elem, thread_max_priority, NULL);
-  // list_push_back(&ready_list, &t->elem);
-
-  // printf("Length of ready [[[After]]] : %d \n", list_size(&ready_list));
   t->status = THREAD_READY;
-  intr_set_level(old_level);
-  // printf("------------------------ready inside unblock -------------------------\n");
+  // printf("TH %s is ready, PRI %d, EFF %d\n", t->name, t->priority, t->effictivePri);
+  list_insert_ordered(&ready_list, &t->elem, thread_max_priority, NULL);
+  // printf("READY LIST\n");
   // struct list_elem *e;
   // for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
   // {
   //   struct thread *th = list_entry(e, struct thread, elem);
   //   printf("Additional thread null ? %d with name = %s and pri = %d\n", th == NULL, th->name, th->priority);
   // }
-  // printf("------------------------End of ready inside unblock -------------------------\n");
+  intr_set_level(old_level);
 }
 
 /* Returns the name of the running thread. */
@@ -400,8 +341,7 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    list_push_back(&ready_list, &cur->elem);
-  // list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -416,7 +356,7 @@ void thread_foreach(thread_action_func *func, void *aux)
   ASSERT(intr_get_level() == INTR_OFF);
 
   for (e = list_begin(&all_list); e != list_end(&all_list);
-       e = list_next(e))
+      e = list_next(e))
   {
     struct thread *t = list_entry(e, struct thread, allelem);
     func(t, aux);
@@ -578,14 +518,13 @@ init_thread(struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *)t + PGSIZE;
   t->effictivePri = priority;
   t->priority = priority;
+  list_init(&t->locks);
+  t->waitingOn = NULL;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
   intr_set_level(old_level);
-  list_init(&t->locks);
-  // lock_init(&t->waitingOn);
-  t->waitingOn = NULL;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
