@@ -32,15 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/* Initializes semaphore SEMA to VALUE.  A semaphore is a
-   nonnegative integer along with two atomic operators for
-   manipulating it:
-
-   - down or "P": wait for the value to become positive, then
-     decrement it.
-
-   - up or "V": increment the value (and wake up one waiting
-     thread, if any). */
 
 static bool thread_max_priority(const struct list_elem *a,
                                 const struct list_elem *b,
@@ -77,6 +68,16 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
   return l1->largestPri > l2->largestPri;
 }
 
+
+/* Initializes semaphore SEMA to VALUE.  A semaphore is a
+   nonnegative integer along with two atomic operators for
+   manipulating it:
+
+   - down or "P": wait for the value to become positive, then
+     decrement it.
+
+   - up or "V": increment the value (and wake up one waiting
+     thread, if any). */
 void sema_init(struct semaphore *sema, unsigned value)
 {
   ASSERT(sema != NULL);
@@ -94,7 +95,6 @@ void sema_init(struct semaphore *sema, unsigned value)
    thread will probably turn interrupts back on. */
 void sema_down(struct semaphore *sema)
 {
-  // printf("Enter sema with %s\n", thread_current()->name);
   enum intr_level old_level;
   ASSERT(sema != NULL);
   ASSERT(!intr_context());
@@ -102,7 +102,7 @@ void sema_down(struct semaphore *sema)
 
   while (sema->value == 0)
   {
-    list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL);
+    list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL); //   EDITED
     thread_block();
   }
 
@@ -157,7 +157,7 @@ void sema_up(struct semaphore *sema)
   }
   sema->value++;
   intr_set_level(old_level);
-  if (!thread_mlfqs)
+  if (!thread_mlfqs)          //    EDITED
   {
     if (th != NULL && th->effictivePri > current->effictivePri)
     {
@@ -243,6 +243,7 @@ void lock_acquire(struct lock *lock)
   enum intr_level old_level;
   old_level = intr_disable();
 
+  //      EDITED  for nested donation
   thread_current()->waitingOn = lock;
   struct lock *currentLock = lock;
   struct thread *lockHolder = lock->holder;
@@ -262,10 +263,11 @@ void lock_acquire(struct lock *lock)
   }
 
   sema_down(&lock->semaphore);
+  //            EDITED
   lock->holder = thread_current();
+  thread_current()->waitingOn = NULL;
   if (!thread_mlfqs)
   {
-    thread_current()->waitingOn = NULL;
     lock->largestPri = thread_current()->effictivePri;
     list_insert_ordered(&thread_current()->locks, &lock->elem, locks_max_priority, NULL);
   }
@@ -309,25 +311,17 @@ void lock_release(struct lock *lock)
   if (!thread_mlfqs)
   {
     struct thread *th = thread_current();
+
+    //      EDITED for multiple donation
     list_remove(&lock->elem);
     /* we should here inherit the lock priority if there are another locks */
-    // list_sort(&th->locks, locks_max_priority, NULL);
+    
     if (!list_empty(&th->locks))
     {
       /* Get the next lock priority */
       struct lock *next_lock = list_entry(list_front(&th->locks), struct lock, elem);
       th->effictivePri = next_lock->largestPri;
-      // if (next_lock->largestPri != -1)
-      // {
-      // if (next_lock->largestPri > th->effictivePri)
-      // {
       th->effictivePri = next_lock->largestPri;
-      // }
-      // }
-      // else
-      // {
-      //   th->effictivePri = next_lock->largestPri;
-      // }
     }
     else
     {
@@ -406,7 +400,6 @@ void cond_wait(struct condition *cond, struct lock *lock)
 
   /* ADDED */
   waiter.semaPriority = thread_current()->effictivePri;
-  // list_push_back(&cond->waiters, &waiter.elem);
   list_insert_ordered(&cond->waiters, &waiter.elem, sema_max_priority, NULL);
   lock_release(lock);
   sema_down(&waiter.semaphore);

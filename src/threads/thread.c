@@ -296,7 +296,6 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  // list_push_back(&ready_list, &t->elem);
   // modified by Hager Melook
   if (thread_mlfqs)
   {
@@ -419,12 +418,7 @@ void calculate_recent_cpu_threads()
 
 void calculate_recent_cpu(struct thread *t, void *aux)
 {
-  //   int load = MUT_FP_INT (load_avg, 2);
-  // int coefficient = DIV (load, ADD_FP_INT(load, 1));
-  // cur->recent_cpu = ADD_FP_INT ((coefficient, cur->recent_cpu),
-  //                            cur->nice);
   t->recent_cpu = ADD_FP_INT(MUT(DIV(MUT_FP_INT(2, load_avg), ADD_FP_INT(MUT_FP_INT(2, load_avg), 1)), t->recent_cpu), t->nice);
-  // ASSERT(t->recent_cpu<0 && t->nice <0);
 }
 
 void calculate_priority_threads()
@@ -475,16 +469,6 @@ void thread_set_nice(int new_nice UNUSED)
   struct thread *current = thread_current();
   current->nice = new_nice;
   calculate_priority(current, NULL);
-  // if (current!= idle_thread)
-  //   {
-  //     if (current->status == THREAD_READY)
-  //       {
-  //         // enum intr_level old_level;
-  //         // old_level = intr_disable ();
-  //         // list_remove (&current->elem);
-  //         // list_insert_ordered (&ready_list, &current->elem, sort_priority, NULL);
-  //         // intr_set_level (old_level);
-  //       }
   if (current->status == THREAD_RUNNING && list_entry(list_begin(&ready_list), struct thread, elem)->priority > current->priority)
     thread_yield();
 }
