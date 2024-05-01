@@ -74,7 +74,7 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
 
   const struct lock *l1 = list_entry(a, struct lock, elem);
   const struct lock *l2 = list_entry(b, struct lock, elem);
-  return l1->largestPri >= l2->largestPri;
+  return l1->largestPri > l2->largestPri;
 }
 
 void sema_init(struct semaphore *sema, unsigned value)
@@ -102,10 +102,10 @@ void sema_down(struct semaphore *sema)
 
   while (sema->value == 0)
   {
-    // printf("thread %s blocked with priority %d\n", thread_current()->name, thread_current()->effictivePri);
     list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL);
     thread_block();
   }
+
   sema->value--;
   intr_set_level(old_level);
 }
@@ -152,16 +152,18 @@ void sema_up(struct semaphore *sema)
 
   if (!list_empty(&sema->waiters))
   {
-    // printf("thread %s unblocked with priority %d\n", thread_current()->name, thread_current()->effictivePri);
     th = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
     thread_unblock(th);
   }
   sema->value++;
-  if (th != NULL && th->priority > current->priority)
-  {
-    thread_yield();
-  }
   intr_set_level(old_level);
+  if (!thread_mlfqs)
+  {
+    if (th != NULL && th->effictivePri > current->effictivePri)
+    {
+      thread_yield();
+    }
+  }
 }
 
 static void sema_test_helper(void *sema_);
@@ -221,7 +223,7 @@ void lock_init(struct lock *lock)
 
   lock->holder = NULL;
   sema_init(&lock->semaphore, 1);
-  lock->largestPri = 0;
+  lock->largestPri = -1;
 }
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -244,22 +246,26 @@ void lock_acquire(struct lock *lock)
   thread_current()->waitingOn = lock;
   struct lock *currentLock = lock;
   struct thread *lockHolder = lock->holder;
+  int donation_level = 0;
+
   while (lockHolder != NULL && thread_current()->effictivePri > lockHolder->effictivePri && !thread_mlfqs)
   {
-    lockHolder->effictivePri = thread_current()->effictivePri;
+    lockHolder->effictivePri = thread_current()->effictivePri; // donate priority for lock holder
     currentLock->largestPri = lockHolder->effictivePri;
     currentLock = lockHolder->waitingOn;
-    if (currentLock == NULL)
+    if (currentLock == NULL || donation_level == 8)
     {
       break;
     }
     lockHolder = currentLock->holder;
+    donation_level++;
   }
+
   sema_down(&lock->semaphore);
+  lock->holder = thread_current();
   if (!thread_mlfqs)
   {
     thread_current()->waitingOn = NULL;
-    lock->holder = thread_current();
     lock->largestPri = thread_current()->effictivePri;
     list_insert_ordered(&thread_current()->locks, &lock->elem, locks_max_priority, NULL);
   }
@@ -299,19 +305,33 @@ void lock_release(struct lock *lock)
   old_level = intr_disable();
 
   lock->holder = NULL;
-  
+
   if (!thread_mlfqs)
   {
     struct thread *th = thread_current();
     list_remove(&lock->elem);
-    lock->largestPri = -1; // TEST
     /* we should here inherit the lock priority if there are another locks */
-    if (!list_empty(&th->locks)) {
+    // list_sort(&th->locks, locks_max_priority, NULL);
+    if (!list_empty(&th->locks))
+    {
       /* Get the next lock priority */
       struct lock *next_lock = list_entry(list_front(&th->locks), struct lock, elem);
       th->effictivePri = next_lock->largestPri;
-    } else {
-      th->effictivePri = thread_current()->priority;
+      // if (next_lock->largestPri != -1)
+      // {
+      // if (next_lock->largestPri > th->effictivePri)
+      // {
+      th->effictivePri = next_lock->largestPri;
+      // }
+      // }
+      // else
+      // {
+      //   th->effictivePri = next_lock->largestPri;
+      // }
+    }
+    else
+    {
+      th->effictivePri = th->priority;
     }
   }
   sema_up(&lock->semaphore);

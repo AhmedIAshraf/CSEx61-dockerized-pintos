@@ -73,8 +73,7 @@ static void *alloc_frame(struct thread *, size_t size);
 static void schedule(void);
 void thread_schedule_tail(struct thread *prev);
 static tid_t allocate_tid(void);
-// added by Hager Melook
-bool sort_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -93,6 +92,10 @@ static bool thread_max_priority(const struct list_elem *a,
 static bool locks_max_priority(const struct list_elem *a,
                                const struct list_elem *b,
                                void *aux UNUSED);
+
+static bool thread_max_original_priority(const struct list_elem *a,
+                                         const struct list_elem *b,
+                                         void *aux UNUSED);
 
 static bool
 thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
@@ -114,7 +117,18 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
 
   const struct lock *l1 = list_entry(a, struct lock, elem);
   const struct lock *l2 = list_entry(b, struct lock, elem);
-  return l1->largestPri >= l2->largestPri;
+  return l1->largestPri > l2->largestPri;
+}
+
+static bool
+thread_max_original_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+
+  const struct thread *th1 = list_entry(a, struct thread, elem);
+  const struct thread *th2 = list_entry(b, struct thread, elem);
+  return th1->priority > th2->priority;
 }
 
 void thread_init(void)
@@ -241,14 +255,18 @@ tid_t thread_create(const char *name, int priority,
   }
 
   if (priority > thread_current()->effictivePri)
+  {
     thread_yield();
+  }
 
   return tid;
 }
+
 bool test_not_idle(struct thread *current)
 {
   return (current != idle_thread);
 }
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
    This function must be called with interrupts turned off.  It
@@ -284,11 +302,11 @@ void thread_unblock(struct thread *t)
   {
     calculate_recent_cpu(t, NULL);
     calculate_priority(t, NULL);
+    list_insert_ordered(&ready_list, &t->elem, thread_max_original_priority, NULL);
   }
   else
-  {
     list_insert_ordered(&ready_list, &t->elem, thread_max_priority, NULL);
-  }
+  
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -357,7 +375,10 @@ void thread_yield(void)
   old_level = intr_disable();
   if (cur != idle_thread)
     // modified by Hager Melook
-    list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
+    if (thread_mlfqs)
+      list_insert_ordered(&ready_list, &cur->elem, thread_max_original_priority, NULL);
+    else
+      list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
   // list_push_back(&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule();
@@ -390,10 +411,12 @@ void calculate_avg_load()
   load_avg = ADD(MUT(DIV_FP_INT(CONVERT_N_TO_FP(59), 60), load_avg), MUT_FP_INT(DIV_FP_INT(CONVERT_N_TO_FP(1), 60), listsize));
   // load_avg=ADD_FP_INT(MUT(DIV_FP_INT(CONVERT_N_TO_FP(59),60),load_avg),MUT_FP_INT(DIV_FP_INT(CONVERT_N_TO_FP(1),60),list_size(&ready_list)));
 }
+
 void calculate_recent_cpu_threads()
 {
   thread_foreach(calculate_recent_cpu, NULL);
 }
+
 void calculate_recent_cpu(struct thread *t, void *aux)
 {
   //   int load = MUT_FP_INT (load_avg, 2);
@@ -403,12 +426,14 @@ void calculate_recent_cpu(struct thread *t, void *aux)
   t->recent_cpu = ADD_FP_INT(MUT(DIV(MUT_FP_INT(2, load_avg), ADD_FP_INT(MUT_FP_INT(2, load_avg), 1)), t->recent_cpu), t->nice);
   // ASSERT(t->recent_cpu<0 && t->nice <0);
 }
+
 void calculate_priority_threads()
 {
   thread_foreach(calculate_priority, NULL);
   if (!list_empty(&ready_list))
-    list_sort(&ready_list, thread_max_priority, NULL);
+    list_sort(&ready_list, thread_max_original_priority, NULL);
 }
+
 void calculate_priority(struct thread *t, void *aux UNUSED)
 {
   ASSERT(is_thread(t));
