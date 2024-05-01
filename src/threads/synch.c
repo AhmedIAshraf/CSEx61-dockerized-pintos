@@ -99,9 +99,10 @@ void sema_down(struct semaphore *sema)
   ASSERT(sema != NULL);
   ASSERT(!intr_context());
   old_level = intr_disable();
-
+  
   while (sema->value == 0)
   {
+    // printf("thread %s blocked with priority %d\n", thread_current()->name, thread_current()->effictivePri);
     list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL);
     thread_block();
   }
@@ -146,18 +147,21 @@ void sema_up(struct semaphore *sema)
 
   old_level = intr_disable();
 
-  // printf("NO. OF WAITERS sema up = %d\n", list_size(&sema->waiters));
-  // printf("WAITERS LIST\n");
-  // struct list_elem *e;
-  // for (e = list_begin(&sema->waiters); e != list_end(&sema->waiters); e = list_next(e))
-  // {
-  //   struct thread *th = list_entry(e, struct thread, elem);
-  //   printf("Additional thread null ? %d with name = %s and pri = %d\n", th == NULL, th->name, th->priority);
-  // }
+  struct thread *th;
+  struct thread *current = thread_current();
+
+  
   if (!list_empty(&sema->waiters))
-    thread_unblock(list_entry(list_pop_front(&sema->waiters),
-                              struct thread, elem));
+  {
+    // printf("thread %s unblocked with priority %d\n", thread_current()->name, thread_current()->effictivePri);
+    th = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+    thread_unblock(th);
+  }
   sema->value++;
+  if (th != NULL && th->priority > current->priority)
+  {
+    thread_yield();
+  }
   intr_set_level(old_level);
 }
 
@@ -303,7 +307,7 @@ void lock_release(struct lock *lock)
 
   lock->holder = NULL;
   sema_up(&lock->semaphore);
-  thread_yield();
+  // thread_yield();
   intr_set_level(old_level);
 }
 
@@ -374,7 +378,7 @@ void cond_wait(struct condition *cond, struct lock *lock)
   sema_init(&waiter.semaphore, 0);
 
   /* ADDED */
-  waiter.semaPriority = thread_current()->priority;
+  waiter.semaPriority = thread_current()->effictivePri;
   // list_push_back(&cond->waiters, &waiter.elem);
   list_insert_ordered(&cond->waiters, &waiter.elem, sema_max_priority, NULL);
   lock_release(lock);
