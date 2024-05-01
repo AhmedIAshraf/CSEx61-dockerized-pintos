@@ -63,7 +63,7 @@ thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *
   const struct thread *t1 = list_entry(a, struct thread, elem);
   const struct thread *t2 = list_entry(b, struct thread, elem);
 
-  return t1->priority >= t2->priority;
+  return t1->effictivePri >= t2->effictivePri;
 }
 
 static bool
@@ -302,9 +302,17 @@ void lock_release(struct lock *lock)
   
   if (!thread_mlfqs)
   {
+    struct thread *th = thread_current();
     list_remove(&lock->elem);
-    thread_current()->effictivePri = thread_current()->priority;
+    lock->largestPri = -1; // TEST
     /* we should here inherit the lock priority if there are another locks */
+    if (!list_empty(&th->locks)) {
+      /* Get the next lock priority */
+      struct lock *next_lock = list_entry(list_front(&th->locks), struct lock, elem);
+      th->effictivePri = next_lock->largestPri;
+    } else {
+      th->effictivePri = thread_current()->priority;
+    }
   }
   sema_up(&lock->semaphore);
   intr_set_level(old_level);

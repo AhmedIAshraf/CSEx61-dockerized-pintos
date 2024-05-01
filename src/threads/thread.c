@@ -103,7 +103,7 @@ thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *
   const struct thread *t1 = list_entry(a, struct thread, elem);
   const struct thread *t2 = list_entry(b, struct thread, elem);
 
-  return t1->priority >= t2->priority;
+  return t1->effictivePri > t2->effictivePri;
 }
 
 static bool
@@ -287,9 +287,9 @@ void thread_unblock(struct thread *t)
   }
   else
   {
-    t->status = THREAD_READY;
-    list_insert_ordered(&ready_list, &t->elem, sort_priority, NULL);
+    list_insert_ordered(&ready_list, &t->elem, thread_max_priority, NULL);
   }
+  t->status = THREAD_READY;
   intr_set_level(old_level);
 }
 
@@ -357,7 +357,7 @@ void thread_yield(void)
   old_level = intr_disable();
   if (cur != idle_thread)
     // modified by Hager Melook
-    list_insert_ordered(&ready_list, &cur->elem, sort_priority, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
   // list_push_back(&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule();
@@ -407,7 +407,7 @@ void calculate_priority_threads()
 {
   thread_foreach(calculate_priority, NULL);
   if (!list_empty(&ready_list))
-    list_sort(&ready_list, sort_priority, NULL);
+    list_sort(&ready_list, thread_max_priority, NULL);
 }
 void calculate_priority(struct thread *t, void *aux UNUSED)
 {
@@ -421,14 +421,7 @@ void calculate_priority(struct thread *t, void *aux UNUSED)
       t->priority = PRI_MAX;
   }
 }
-bool sort_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-  ASSERT(a != NULL);
-  ASSERT(b != NULL);
-  const struct thread *t1 = list_entry(a, struct thread, elem);
-  const struct thread *t2 = list_entry(b, struct thread, elem);
-  return t1->priority > t2->priority;
-}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
