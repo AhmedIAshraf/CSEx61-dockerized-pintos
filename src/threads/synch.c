@@ -227,76 +227,28 @@ void lock_init(struct lock *lock)
    we need to sleep. */
 void lock_acquire(struct lock *lock)
 {
-
   ASSERT(lock != NULL);
   ASSERT(!intr_context());
   ASSERT(!lock_held_by_current_thread(lock));
 
-  // struct list_elem *e = list_begin(&lock->semaphore.waiters);
-  // if (e->next == NULL)
-  // {
-  //   printf("HELLO YA 3ABEET1\n");
-  // }
+  enum intr_level old_level;
+  old_level = intr_disable();
 
-  // if (e->prev == NULL)
-  // {
-  //   printf("HELLO YA 3ABEET2\n");
-  // }
-
-  // if (e->next == list_end(&lock->semaphore.waiters))
-  // {
-  //   printf("HELLO YA 3ABEET3\n");
-  // }
-
-  // if (list_next(e) == NULL)
-  // {
-  //   printf("HELLO YA 3ABEET4\n");
-  // }
-
-  // if (list_next(e) == list_end(&lock->semaphore.waiters))
-  // {
-  //   printf("HELLO YA 3ABEET5\n");
-  // }
-
-  // for (; e != list_end(&lock->semaphore.waiters); e = list_next(e))
-  // {
-  //   if (e == NULL)
-  //   {
-  //     break;
-  //   }
-
-  //   printf("HELLO YA IBN EL SARMA\n");
-  //   struct thread *th = list_entry(e, struct thread, elem);
-  //   printf("Waiter name %s, priority %d, eff %d\n", th->name, th->priority, th->effictivePri);
-  // }
   thread_current()->waitingOn = lock;
-
   struct lock *currentLock = lock;
   struct thread *lockHolder = lock->holder;
   while (lockHolder != NULL && thread_current()->effictivePri > lockHolder->effictivePri)
   {
-    // printf("Entered Aqcuire\n");
-    // printf("thread_current %s\n", thread_current()->name);
-    // printf("holder %s\n", lockHolder->name);
-    // printf("holder before %d\n", lockHolder->effictivePri);
     lockHolder->effictivePri = thread_current()->effictivePri;
-    // printf("holder after %d\n", lockHolder->effictivePri);
-    if (currentLock->largestPri < thread_current()->effictivePri)
-    {
-      currentLock->largestPri = thread_current()->effictivePri;
-    }
+    currentLock->largestPri = lockHolder->effictivePri;
     currentLock = lockHolder->waitingOn;
     if (currentLock == NULL)
     {
-      printf("Acuire1 ended his loop\n");
       break;
     }
     lockHolder = currentLock->holder;
-    // printf("is null %d\n", lockHolder == NULL);
   }
-  // printf("before sema\n");
   sema_down(&lock->semaphore);
-  // printf("Returned from sema\n");
   thread_current()->waitingOn = NULL;
   lock->holder = thread_current();
   lock->largestPri = thread_current()->effictivePri;
@@ -306,10 +258,7 @@ void lock_acquire(struct lock *lock)
   // list_push_back(&thread_current()->locks, &lock->elem);
   //--------------------------------------------------------
 
-  // struct list_elem *e = list_pop_back(&thread_current()->locks);
-  // struct lock *a = list_entry(e, struct lock, elem);
-  // printf("\n%d\n", a->largestPri);
-  // intr_set_level(old_level);
+  intr_set_level(old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -338,19 +287,20 @@ bool lock_try_acquire(struct lock *lock)
    handler. */
 void lock_release(struct lock *lock)
 {
-  // printf("curr in release is %s\n", thread_current()->name);
-
   ASSERT(lock != NULL);
   ASSERT(lock_held_by_current_thread(lock));
+  enum intr_level old_level;
+  old_level = intr_disable();
 
   // -------------------Problem----------------------------------
   list_remove(&lock->elem);
   thread_current()->effictivePri = thread_current()->priority;
   // -------------------------------------------------------------
-  // struct list_elem *a;
-  // for (a = list_begin(&thread_current()->locks);
+
   lock->holder = NULL;
   sema_up(&lock->semaphore);
+  thread_yield();
+  intr_set_level(old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false
