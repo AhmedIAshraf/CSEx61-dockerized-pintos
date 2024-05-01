@@ -63,7 +63,7 @@ thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *
   const struct thread *t1 = list_entry(a, struct thread, elem);
   const struct thread *t2 = list_entry(b, struct thread, elem);
 
-  return t1->effictivePri >= t2->effictivePri;
+  return t1->effictivePri > t2->effictivePri;
 }
 
 static bool
