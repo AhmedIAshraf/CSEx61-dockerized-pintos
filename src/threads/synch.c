@@ -32,7 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-
 static bool thread_max_priority(const struct list_elem *a,
                                 const struct list_elem *b,
                                 void *aux UNUSED);
@@ -67,7 +66,6 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
   const struct lock *l2 = list_entry(b, struct lock, elem);
   return l1->largestPri > l2->largestPri;
 }
-
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -104,6 +102,7 @@ void sema_down(struct semaphore *sema)
   {
     list_insert_ordered(&sema->waiters, &thread_current()->elem, thread_max_priority, NULL); //   EDITED
     thread_block();
+    // list_sort(&sema->waiters, thread_max_priority, NULL);
   }
 
   sema->value--;
@@ -135,6 +134,23 @@ bool sema_try_down(struct semaphore *sema)
   return success;
 }
 
+
+static bool thread_max_original_priority(const struct list_elem *a,
+                                         const struct list_elem *b,
+                                         void *aux UNUSED);
+
+
+static bool
+thread_max_original_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  ASSERT(a != NULL);
+  ASSERT(b != NULL);
+
+  const struct thread *th1 = list_entry(a, struct thread, elem);
+  const struct thread *th2 = list_entry(b, struct thread, elem);
+  return th1->priority > th2->priority;
+}
+
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -152,12 +168,16 @@ void sema_up(struct semaphore *sema)
 
   if (!list_empty(&sema->waiters))
   {
+    if (!thread_mlfqs)
+      list_sort(&sema->waiters, thread_max_priority, NULL);
+    else 
+      list_sort(&sema->waiters, thread_max_original_priority, NULL);
     th = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
     thread_unblock(th);
   }
   sema->value++;
   intr_set_level(old_level);
-  if (!thread_mlfqs)          //    EDITED
+  if (!thread_mlfqs) //    EDITED
   {
     if (th != NULL && th->effictivePri > current->effictivePri)
     {
@@ -315,7 +335,7 @@ void lock_release(struct lock *lock)
     //      EDITED for multiple donation
     list_remove(&lock->elem);
     /* we should here inherit the lock priority if there are another locks */
-    
+
     if (!list_empty(&th->locks))
     {
       /* Get the next lock priority */

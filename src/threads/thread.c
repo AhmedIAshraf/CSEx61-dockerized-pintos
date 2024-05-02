@@ -248,10 +248,6 @@ tid_t thread_create(const char *name, int priority,
   {
     calculate_recent_cpu(t, NULL);
     calculate_priority(t, NULL);
-    // intr_disable();
-    // calculate_recent_cpu_threads();
-    // calculate_priority_threads();
-    // intr_enable();
   }
 
   if (priority > thread_current()->effictivePri)
@@ -408,7 +404,6 @@ void calculate_avg_load()
   if (thread != idle_thread)
     listsize = size + 1;
   load_avg = ADD(MUT(DIV_FP_INT(CONVERT_N_TO_FP(59), 60), load_avg), MUT_FP_INT(DIV_FP_INT(CONVERT_N_TO_FP(1), 60), listsize));
-  // load_avg=ADD_FP_INT(MUT(DIV_FP_INT(CONVERT_N_TO_FP(59),60),load_avg),MUT_FP_INT(DIV_FP_INT(CONVERT_N_TO_FP(1),60),list_size(&ready_list)));
 }
 
 void calculate_recent_cpu_threads()
