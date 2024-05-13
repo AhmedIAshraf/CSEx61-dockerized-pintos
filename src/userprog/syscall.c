@@ -52,7 +52,11 @@ syscall_handler (struct intr_frame *f UNUSED)
                   exit(*(esp+1));
                   break;
 
-    case SYS_EXEC:process_execute();
+    case SYS_EXEC: if(!is_user_vaddr ((void *)(esp+1))){
+                      exit(-1);
+                    }
+                  const char *file_name = (const char *)*(esp + 1);
+                  f->eax = process_execute(file_name);
                   break;
 
     case SYS_WAIT://implement
