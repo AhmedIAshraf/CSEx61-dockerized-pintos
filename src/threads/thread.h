@@ -107,7 +107,7 @@ struct thread
     struct list children;               /* List of thread/process children */
     enum thread_status *child_status;   /* Child's -that the parent is waiting on- status */
     tid_t waiting_on_child_id;          /* Child's -that the parent is waiting on- id */
-    struct semaphore *wait_child_sema;  /* Semaphore which the parent waits on while waiting the child */
+    struct semaphore wait_child_sema;  /* Semaphore which the parent waits on while waiting the child */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;

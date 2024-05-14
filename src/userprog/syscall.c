@@ -130,7 +130,31 @@ syscall_handler(struct intr_frame *f UNUSED) {
 
 void
 exit(int status) {
-    printf("exit");
+//    printf("exit");
+    struct thread *cur = thread_current();
+    struct list_elem *e = list_begin (&cur->open_files);
+    printf("%s: exit(%d)\n", cur->name, status);
+
+    for (; e != list_end (&cur->open_files); e = list_next (e))
+    {
+        struct open_file *f = list_entry (e, struct open_file, elem);
+        close(f->fd);
+    }
+
+    struct thread *parent = cur->parent;
+    if (parent->waiting_on_child_id == cur->tid) {
+        parent->child_status = status;
+        parent->waiting_on_child_id = -1;
+        sema_up(&parent->wait_child_sema);
+    } else {
+        list_remove(&cur->elem);
+
+        struct list_elem *c = list_begin (&cur->wait_child_sema.waiters);
+        for (; c != list_end (&cur->wait_child_sema.waiters); c = list_next (c)) {
+            struct thread *child = list_entry(c, struct thread, elem);
+            sema_up(&cur->wait_child_sema);
+        }
+    }
     thread_exit();
 }
 
