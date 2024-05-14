@@ -197,6 +197,11 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  /* Set thread parent & add child */
+  struct thread *parent_thread = thread_current();
+  t->parent = parent_thread;
+  list_push_back(&parent_thread->children, &t->elem);
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -466,7 +471,10 @@ init_thread (struct thread *t, const char *name, int priority)
   // added by Hager Melook
   list_init(&t->open_files);
   t->file_descriptor=2;
-  
+
+  // initialize children list
+  list_init(&t->children);
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);

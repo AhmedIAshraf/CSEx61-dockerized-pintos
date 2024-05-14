@@ -101,6 +101,10 @@ struct thread
     struct list open_files;
     int file_descriptor;
 
+    // Parent - Children Communication
+    struct thread *parent;              /* Thread/Process parent */
+    struct list children;               /* List of thread/process children */
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;
                     /* List element. */
