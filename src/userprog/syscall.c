@@ -8,23 +8,25 @@
 #include "threads/vaddr.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "lib/user/syscall.h"
 
 static void syscall_handler(struct intr_frame *);
 static struct lock file_sync_lock;
 static uint32_t *esp;
 
-static void halt(void);
-static void exit(int);
-static bool create(const char *, unsigned);
-static bool remove(const char *);
-static int open(const char *);
-static int filesize(int);
-static int read(int, void *, unsigned);
-static int write(int, void *, unsigned);
-static void seek(int, unsigned);
-static unsigned tell(int);
-static void close(int);
-static bool is_child_valid(tid_t);
+void halt(void);
+void exit(int);
+pid_t exec (const char *);
+bool create(const char *, unsigned);
+bool remove(const char *);
+int open(const char *);
+int filesize(int);
+int read(int, void *, unsigned);
+int write(int, void *, unsigned);
+void seek(int, unsigned);
+unsigned tell(int);
+void close(int);
+bool is_child_valid(tid_t);
 
 void syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -56,7 +58,7 @@ syscall_handler(struct intr_frame *f UNUSED) {
                 exit(-1);
             }
             const char *file_name = (const char *) *(esp + 1);
-            f->eax = process_execute(file_name);
+            f->eax = exec(file_name);
             break;
 
         case SYS_WAIT: //implement
@@ -161,6 +163,12 @@ exit(int status) {
 void
 halt () {
     shutdown_power_off();
+}
+
+pid_t exec (const char *file)
+{
+    pid_t t = process_execute(file);
+    return t;
 }
 
 struct open_file *

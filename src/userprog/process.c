@@ -19,7 +19,8 @@
 #include "threads/vaddr.h"
 
 static thread_func start_process NO_RETURN;
-static bool load(const char *file_name, void (**eip) (void), void **esp, char **argv);
+static bool load(const char *file_name, void (**eip) (void), void **esp);
+static int argc;
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -39,29 +40,11 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-        argc++;
 
-    // Allocate array for arguments
-    char **argv = malloc((argc + 1) * sizeof(char *));
-    if (argv == NULL) {
-        palloc_free_page(fn_copy);
-        return TID_ERROR;
-    }
-
-    // Copy arguments to array
-    argc = 0;
-    for (token = strtok_r((char *)file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
-        argv[argc] = token;
-        argc++;
-    }
-    argv[argc] = NULL;
-
-    tid = thread_create (argv[0], PRI_DEFAULT, start_process, argv);
+    tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
     if (tid == TID_ERROR) {
         palloc_free_page (fn_copy);
-        free(argv);
     } else {
         // TODO process wait for child
 //        while ()
@@ -74,7 +57,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  char **argv = (char **)file_name_;
+  char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
 
@@ -83,10 +66,10 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (argv[0], &if_.eip, &if_.esp,argv);
+  success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  free(argv[0]);
+  palloc_free_page (file_name);
   if (!success)
     thread_exit ();
 
@@ -221,7 +204,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack(void **esp, char **argv);
+static bool setup_stack(void **esp, char *argv[]);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -232,7 +215,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load(const char *file_name, void (**eip) (void), void **esp, char **argv)
+load(const char *file_name, void (**eip) (void), void **esp)
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -240,6 +223,31 @@ load(const char *file_name, void (**eip) (void), void **esp, char **argv)
   off_t file_ofs;
   bool success = false;
   int i;
+  char *fn_copy, *token, *save_ptr;
+
+  fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+      return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  // Count the number of arguments
+  for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+      argc++;
+
+  char *argv[argc];
+
+  // Copy arguments to argv array
+  argc = 0; // Reset argc
+  for (token = strtok_r((char *)file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)) {
+      argv[argc] = token;
+      argc++;
+  }
+
+  // Print the arguments
+  for (int i = 0; i < argc; i++) {
+      printf("%s\n", argv[i]);
+  }
+
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -455,61 +463,69 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
-setup_stack(void **esp, char **argv)
-{
-  uint8_t *kpage;
-  bool success = false;
-  int argc = 0;
+#define STACK_DEBUG 0 // Set to 1 for debug messages
 
-  // Calculate argc from argv
-  while (argv[argc] != NULL)
-      argc++;
+static bool setup_stack(void **esp, char *argv[]) {
+    uint8_t *kpage;
+    bool success = false;
+    size_t arg_size;
 
-  kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-  if (kpage != NULL)
-  {
-      success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-      {
-          *esp = PHYS_BASE;
-//          *esp = PHYS_BASE - 12;
-          // Word-align
-          while ((uintptr_t)*esp % 4 != 0)
-              (*esp)--;
-
-          // push NULL
-          *esp -= sizeof(char *);
-          *((char **)(*esp)) = NULL;
-
-          // Push addresses of arguments
-          for (int i = argc - 1; i >= 0; i--)
-          {
-              *esp -= sizeof(char *);
-              *((char **)(*esp)) = argv[i];
-          }
-
-          // push argv
-          char **argv_ptr = (char **)(*esp);
-          *esp -= sizeof(char **);
-          *((char ***)(*esp)) = argv_ptr;
-
-          // push argc
-          *esp -= sizeof(int);
-          *((int *)(*esp)) = argc;
-
-          // push fake return address
-          *esp -= sizeof(void *);
-          *((void **)(*esp)) = NULL;
-      }
-      else
-      {
-          palloc_free_page(kpage);
-      }
+    for (int i = 0; i < argc; i++) {
+      printf("%s\n", argv[i]);
   }
+    
+    // Calculate total argument size including null terminators
+    arg_size = 0;
+    for (int i = 0; i < argc; i++) {
+        arg_size += strlen(argv[i]) + 1; // +1 for null terminator
+    }
 
-  return success;
+    // Round down the stack pointer to a multiple of 4 for word alignment
+    *esp = ((uint8_t *)PHYS_BASE) - arg_size - 4 * (argc + 4);
+    *esp = (void *)((uintptr_t)(*esp) & ~3);
+
+    // Initialize kpage
+    kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+    if (kpage != NULL) {
+        success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
+        if (success) {
+            // Push argv pointers
+            char *arg_ptr;
+            for (int i = argc - 1; i >= 0; i--) {
+                arg_ptr = *esp;
+                size_t arg_length = strlen(argv[i]) + 1; // +1 for null terminator
+                *esp -= arg_length;
+                memcpy(*esp, argv[i], arg_length); // Copy the argument onto the stack
+                *((char **)(*esp)) = arg_ptr; // Push the address onto the stack
+            }
+
+            // Push argv[argc] (null pointer sentinel)
+            *esp -= 4;
+            *((char **)(*esp)) = NULL;
+
+            // Push argv
+            *esp -= 4;
+            *((char ***)(*esp)) = (char **)(*esp + 4);
+
+            // Push argc
+            *esp -= 4;
+            *((int *)(*esp)) = argc;
+
+            // Push fake return address
+            *esp -= 4;
+            *((void **)(*esp)) = NULL;
+
+            #if STACK_DEBUG
+            printf("Stack setup successful\n");
+            #endif
+        } else {
+            palloc_free_page(kpage);
+        }
+    }
+
+    return success;
 }
+
 
 /* Adds a mapping from user virtual address UPAGE to kernel
    virtual address KPAGE to the page table.
