@@ -24,6 +24,7 @@ static int write(int, void *, unsigned);
 static void seek(int, unsigned);
 static unsigned tell(int);
 static void close(int);
+static bool is_child_valid(tid_t);
 
 void syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -59,6 +60,7 @@ syscall_handler(struct intr_frame *f UNUSED) {
             break;
 
         case SYS_WAIT: //implement
+//            if (is_child_valid())
             break;
 
         case SYS_CREATE:
@@ -67,12 +69,14 @@ syscall_handler(struct intr_frame *f UNUSED) {
             }
             f->eax = create((char *) *(esp + 1), *(esp + 2));
             break;
+
         case SYS_REMOVE:
             if (!is_user_vaddr((void *) (esp + 1))) {
                 exit(-1);
             }
             f->eax = remove((char *) *(esp + 1));
             break;
+
         case SYS_OPEN:
             if (!is_user_vaddr((void *) (esp + 1))) {
                 exit(-1);
@@ -265,4 +269,10 @@ close (int fd) {
     }
     lock_release(&file_sync_lock);
     return;
+}
+
+bool
+is_child_valid(tid_t pid) {
+    // TODO
+    return true;
 }

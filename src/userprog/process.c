@@ -64,6 +64,7 @@ process_execute (const char *file_name)
         free(argv);
     } else {
         // TODO process wait for child
+//        while ()
     }
   return tid;
 }
@@ -109,8 +110,9 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
+    while (true) ;
   return -1;
 }
 
@@ -336,6 +338,7 @@ load(const char *file_name, void (**eip) (void), void **esp, char **argv)
  done:
      // TODO
      /* File Write Deny */
+     file_deny_write(file);
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;
@@ -469,7 +472,7 @@ setup_stack(void **esp, char **argv)
       if (success)
       {
           *esp = PHYS_BASE;
-
+//          *esp = PHYS_BASE - 12;
           // Word-align
           while ((uintptr_t)*esp % 4 != 0)
               (*esp)--;
