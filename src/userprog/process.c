@@ -228,7 +228,7 @@ load(const char *file_name, void (**eip) (void), void **esp)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
       return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy, file_name,  strlen(file_name)+1);
 
   // Count the number of arguments
   for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
@@ -481,47 +481,61 @@ static bool setup_stack(void **esp, char *argv[]) {
     }
 
     // Round down the stack pointer to a multiple of 4 for word alignment
-    *esp = ((uint8_t *)PHYS_BASE) - arg_size - 4 * (argc + 4);
-    *esp = (void *)((uintptr_t)(*esp) & ~3);
+    // *esp = ((uint8_t *)PHYS_BASE) - arg_size - 4 * (argc + 4);
+    // *esp = (void *)((uintptr_t)(*esp) & ~3);
 
     // Initialize kpage
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-        if (success) {
+        if (success) 
             // Push argv pointers
-            char *arg_ptr;
-            for (int i = argc - 1; i >= 0; i--) {
+            *esp = PHYS_BASE;
+        else
+            palloc_free_page (kpage); 
+      }
+
+  char* addresses [argc];
+   int size_count;
+   char *arg_ptr;
+   int arg_length;
+   for (int i = argc - 1; i >= 0; i--) {
                 arg_ptr = *esp;
-                size_t arg_length = strlen(argv[i]) + 1; // +1 for null terminator
+                arg_length = strlen(argv[i]) + 1; // +1 for null terminator
                 *esp -= arg_length;
-                memcpy(*esp, argv[i], arg_length); // Copy the argument onto the stack
-                *((char **)(*esp)) = arg_ptr; // Push the address onto the stack
-            }
+                addresses[i] = (char*)*esp;
+                memcpy(*esp, argv[i], arg_length);
+                size_count+=arg_length;
+ }
+ int word_align = 4 - (size_count%4);
+  *esp -= word_align;
+  memset(*esp, 0, word_align);
 
-            // Push argv[argc] (null pointer sentinel)
-            *esp -= 4;
-            *((char **)(*esp)) = NULL;
+  int z=0;
+  *esp -= sizeof(int);
+  memcpy(*esp, &z, sizeof(int) );
 
-            // Push argv
-            *esp -= 4;
-            *((char ***)(*esp)) = (char **)(*esp + 4);
+  for (int i = argc-1; i>=0; i-- ){
+	*esp -= sizeof(int);
+	memcpy(*esp,&addresses[i], sizeof(int));
+  }
+  int pointer = *esp ;
+  *esp -= sizeof(char**);
+  memcpy(*esp,&pointer, sizeof(char**));
 
-            // Push argc
-            *esp -= 4;
-            *((int *)(*esp)) = argc;
 
-            // Push fake return address
-            *esp -= 4;
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+
+  *esp -= sizeof(void *);
+  memcpy(*esp,&z, sizeof(void*));
+  hex_dump((uintptr_t)*esp,*esp,PHYS_BASE-*esp , true);
             *((void **)(*esp)) = NULL;
 
             #if STACK_DEBUG
             printf("Stack setup successful\n");
             #endif
-        } else {
-            palloc_free_page(kpage);
-        }
-    }
 
     return success;
 }
