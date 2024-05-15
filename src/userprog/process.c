@@ -40,15 +40,18 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-
     tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-
+    printf("sema downing parent\n");
+    sema_down(&thread_current()->wait_child_sema);
+    printf("parent wake up\n");
     if (tid == TID_ERROR) {
         palloc_free_page (fn_copy);
     } else {
-        // TODO process wait for child
-//        while ()
+      printf("parent waiting\n");
+      tid = process_wait(tid);
+      printf("parent wake up\n");
     }
+    printf("tid = %d\n", tid);
   return tid;
 }
 
@@ -70,9 +73,13 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success)
+  if (!success) {
+    sema_up(&thread_current()->parent->wait_child_sema);
     thread_exit ();
-
+  } else {
+    sema_up(&thread_current()->parent->wait_child_sema);
+    sema_down(&thread_current()->wait_child_sema);
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -83,6 +90,30 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+static bool is_child_valid(tid_t);
+
+bool
+is_child_valid(tid_t pid) {
+    struct thread *cur = thread_current();
+    struct list_elem *c = list_begin (&cur->children);
+    for (; c != list_end (&cur->children); c = list_next (c)) {
+        struct thread *child = list_entry(c, struct thread, elem);
+        if (child->tid == pid)
+            return true;
+    }
+    return false;
+}
+
+struct thread *
+get_child(tid_t pid) {
+  struct thread *cur = thread_current();
+  struct list_elem *c = list_begin (&cur->children);
+  for (; c != list_end (&cur->children); c = list_next (c)) {
+      struct thread *child = list_entry(c, struct thread, elem);
+      if (child->tid == pid)
+          return child;
+  }
+}
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -95,10 +126,20 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-    while (true)
-        thread_yield();
+  printf("Hello Wait\n");
+  if (is_child_valid(child_tid)) {
+    struct thread *parent = thread_current();
+    parent->waiting_on_child_id = child_tid;
+    list_remove(&parent->child_elem);
+    struct thread *child = get_child(child_tid);
+    sema_up(&child->wait_child_sema);
+    sema_down(&parent->wait_child_sema);
+    return child->status;
+  } 
   return -1;
 }
+
+
 
 /* Free the current process's resources. */
 void
@@ -345,9 +386,8 @@ load(const char *file_name, void (**eip) (void), void **esp)
   success = true;
 
  done:
-     // TODO
-     /* File Write Deny */
-     file_deny_write(file);
+      // TODO
+      file_deny_write(file);
   /* We arrive here whether the load is successful or not. */
   file_close (file);
   return success;
@@ -471,9 +511,9 @@ static bool setup_stack(void **esp, char *argv[]) {
     size_t arg_size;
 
     for (int i = 0; i < argc; i++) {
-      printf("%s\n", argv[i]);
-  }
-    
+        printf("%s\n", argv[i]);
+    }
+
     // Calculate total argument size including null terminators
     arg_size = 0;
     for (int i = 0; i < argc; i++) {
@@ -488,24 +528,24 @@ static bool setup_stack(void **esp, char *argv[]) {
     kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage != NULL) {
         success = install_page(((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
-        if (success) 
+        if (success)
             // Push argv pointers
             *esp = PHYS_BASE;
         else
-            palloc_free_page (kpage); 
-      }
+            palloc_free_page (kpage);
+    }
 
   char* addresses [argc];
    int size_count;
    char *arg_ptr;
    int arg_length;
    for (int i = argc - 1; i >= 0; i--) {
-                arg_ptr = *esp;
-                arg_length = strlen(argv[i]) + 1; // +1 for null terminator
-                *esp -= arg_length;
-                addresses[i] = (char*)*esp;
-                memcpy(*esp, argv[i], arg_length);
-                size_count+=arg_length;
+            arg_ptr = *esp;
+            arg_length = strlen(argv[i]) + 1; // +1 for null terminator
+            *esp -= arg_length;
+            addresses[i] = (char*)*esp;
+            memcpy(*esp, argv[i], arg_length);
+            size_count+=arg_length;
  }
  int word_align = 4 - (size_count%4);
   *esp -= word_align;
@@ -516,8 +556,8 @@ static bool setup_stack(void **esp, char *argv[]) {
   memcpy(*esp, &z, sizeof(int) );
 
   for (int i = argc-1; i>=0; i-- ){
-	*esp -= sizeof(int);
-	memcpy(*esp,&addresses[i], sizeof(int));
+      *esp -= sizeof(int);
+      memcpy(*esp,&addresses[i], sizeof(int));
   }
   int pointer = *esp ;
   *esp -= sizeof(char**);

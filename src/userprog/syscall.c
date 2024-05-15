@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "lib/user/syscall.h"
+#include "userprog/process.h"
 
 static void syscall_handler(struct intr_frame *);
 static struct lock file_sync_lock;
@@ -22,11 +23,11 @@ bool remove(const char *);
 int open(const char *);
 int filesize(int);
 int read(int, void *, unsigned);
-int write(int,const void *, unsigned);
+int write(int,void *, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
-bool is_child_valid(tid_t);
+
 
 void syscall_init(void) {
     intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -35,7 +36,7 @@ void syscall_init(void) {
 
 static void
 syscall_handler(struct intr_frame *f UNUSED) {
-    printf("system call!\n");
+//    printf("system call!\n");
     esp = f->esp;
     if (!is_user_vaddr((void *) (esp))) {
         exit(-1);
@@ -61,8 +62,11 @@ syscall_handler(struct intr_frame *f UNUSED) {
             f->eax = exec(file_name);
             break;
 
-        case SYS_WAIT: //implement
-//            if (is_child_valid())
+        case SYS_WAIT: 
+            if (!is_user_vaddr((void *) (esp + 1))) {
+                exit(-1);
+            }
+            process_wait(*(esp + 1));
             break;
 
         case SYS_CREATE:
@@ -130,9 +134,9 @@ syscall_handler(struct intr_frame *f UNUSED) {
     }
 }
 
+
 void
 exit(int status) {
-//    printf("exit");
     struct thread *cur = thread_current();
     struct list_elem *e = list_begin (&cur->open_files);
     printf("%s: exit(%d)\n", cur->name, status);
@@ -144,20 +148,27 @@ exit(int status) {
     }
 
     struct thread *parent = cur->parent;
-    if (parent->waiting_on_child_id == cur->tid) {
+    if (parent->waiting_on_child_id == cur->tid) { // if thread is a child and there is a parent waiting on it
+        printf("Hello Child\n");
         parent->child_status = status;
         parent->waiting_on_child_id = -1;
-        sema_up(&parent->wait_child_sema);
-    } else {
+        sema_up(&parent->wait_child_sema);         // Wake up the parent
+    } else {                                       // else the parent not waiting on the child
+        printf("Hello Parent\n");
         list_remove(&cur->child_elem);
-
-        struct list_elem *c = list_begin (&cur->wait_child_sema.waiters);
-        for (; c != list_end (&cur->wait_child_sema.waiters); c = list_next (c)) {
-            struct thread *child = list_entry(c, struct thread, elem);
-            sema_up(&cur->wait_child_sema);
-        }
+        printf("Child Removed\n");
     }
+    struct list_elem *c = list_begin (&cur->wait_child_sema.waiters);
+    printf("Start sema up\n");
+    for (; c != list_end (&cur->wait_child_sema.waiters); c = list_next (c)) {
+        printf("First Child waking up\n");
+        struct thread *child = list_entry(c, struct thread, elem);
+        sema_up(&child->wait_child_sema);       // Wake up the children
+        printf("Hello1\n");
+    }
+    printf("Finished waking up the children\n");
     thread_exit();
+    printf("Finish exit\n");
 }
 
 void
@@ -254,7 +265,7 @@ read (int fd, void *buffer, unsigned size) {
 }
 
 int
-write (int fd,const void *buffer, unsigned size) {
+write (int fd, void *buffer, unsigned size) {
     if (buffer == NULL) return -1;
     if (fd == 1) {
         putbuf((char *) buffer, size);
@@ -301,10 +312,4 @@ close (int fd) {
     }
     lock_release(&file_sync_lock);
     return;
-}
-
-bool
-is_child_valid(tid_t pid) {
-    // TODO
-    return true;
 }
