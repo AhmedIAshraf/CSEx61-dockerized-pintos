@@ -200,7 +200,7 @@ thread_create (const char *name, int priority,
   /* Set thread parent & add child */
   struct thread *parent_thread = thread_current();
   t->parent = parent_thread;
-  list_push_back(&parent_thread->children, &t->elem);
+  list_push_back(&parent_thread->children, &t->child_elem);
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -474,6 +474,9 @@ init_thread (struct thread *t, const char *name, int priority)
 
   // initialize children list
   list_init(&t->children);
+  sema_init(&t->wait_child_sema, 0);
+  t->child_status = -1;
+  t->waiting_on_child_id = -1;
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
