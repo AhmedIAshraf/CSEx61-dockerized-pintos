@@ -286,15 +286,12 @@ int read(int fd, void *buffer, unsigned size)
     if (buffer == NULL)
         return -1;
     lock_acquire(&file_sync_lock);
-    // if (list_empty(&thread_current()->open_files))
-    // {
-    //     lock_release(&file_sync_lock);
-    //     return;
-    // }
     struct open_file *file = get_file(fd);
     int actual_size;
     if (file != NULL)
+    {
         actual_size = file_read(file->file, buffer, size);
+    }
     lock_release(&file_sync_lock);
     if (file == NULL)
         return -1;
@@ -311,11 +308,7 @@ int write(int fd, void *buffer, unsigned size)
         return size;
     }
     lock_acquire(&file_sync_lock);
-    // if (list_empty(&thread_current()->open_files))
-    // {
-    //     lock_release(&file_sync_lock);
-    //     return;
-    // }
+
     struct open_file *file = get_file(fd);
     int actual_size;
     if (file != NULL)
@@ -362,8 +355,7 @@ void close(int fd)
     if (file != NULL)
     {
         file_close(file->file);
-        list_remove(&file->elem);
-        // file_allow_write(file);
+        // list_remove(&file->elem);
     }
     lock_release(&file_sync_lock);
     return;

@@ -39,16 +39,10 @@ tid_t process_execute(const char *file_name)
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
-  // char* [] parsedName;
-  // char *token, *save_ptr;
-  // for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
-  //   parsedName
-  // }
+  // char *parsedName;
+  token = strtok_r((char *)file_name, " ", &save_ptr);
 
-  char *parsedName;
-  token = strtok_r(file_name, " ", &parsedName);
-
-  tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create(token, PRI_DEFAULT, start_process, fn_copy);
   sema_down(&thread_current()->wait_child_sema);
   if (tid == TID_ERROR)
   {
