@@ -150,49 +150,42 @@ syscall_handler(struct intr_frame *f UNUSED)
     }
 }
 
-int
-wait(pid_t child_id) 
+int wait(pid_t child_id)
 {
-    process_wait(child_id);
+    return process_wait(child_id);
 }
 
 void exit(int status)
 {
     struct thread *cur = thread_current();
-    struct list_elem *e = list_begin(&cur->open_files);
+    struct list_elem *e = list_begin(&cur->children);
     printf("%s: exit(%d)\n", cur->name, status);
 
-    for (; e != list_end(&cur->open_files); e = list_next(e))
+    for (; e != list_end(&cur->children); e = list_next(e))
     {
         struct open_file *f = list_entry(e, struct open_file, elem);
         close(f->fd);
+        list_remove(&f->elem);
     }
 
     struct thread *parent = cur->parent;
     if (parent->waiting_on_child_id == cur->tid)
     { // if thread is a child and there is a parent waiting on it
-        // printf("Hello Child\n");
         parent->child_status = status;
         parent->waiting_on_child_id = -1;
         sema_up(&parent->wait_child_sema); // Wake up the parent
     }
     else
     { // else the parent not waiting on the child
-        // printf("Hello Parent\n");
         list_remove(&cur->child_elem);
-        // printf("Child Removed\n");
     }
     struct list_elem *c = list_begin(&cur->children);
-    // printf("Start sema up\n");
     for (; c != list_end(&cur->children); c = list_next(c))
     {
-        // printf("First Child waking up\n");
         struct thread *child = list_entry(c, struct thread, child_elem);
         sema_up(&child->wait_child_sema); // Wake up the children
     }
-    // printf("Exit child status = %d\n", parent->child_status);
     thread_exit();
-    // printf("Finish exit\n");
 }
 
 void halt()
@@ -234,7 +227,7 @@ get_file(int fd)
 bool create(const char *file, unsigned initial_size)
 {
     if (file == NULL)
-        return false;
+        exit(-1);
     lock_acquire(&file_sync_lock);
     bool success = filesys_create(file, initial_size);
     lock_release(&file_sync_lock);
@@ -293,6 +286,11 @@ int read(int fd, void *buffer, unsigned size)
     if (buffer == NULL)
         return -1;
     lock_acquire(&file_sync_lock);
+    // if (list_empty(&thread_current()->open_files))
+    // {
+    //     lock_release(&file_sync_lock);
+    //     return;
+    // }
     struct open_file *file = get_file(fd);
     int actual_size;
     if (file != NULL)
@@ -313,6 +311,11 @@ int write(int fd, void *buffer, unsigned size)
         return size;
     }
     lock_acquire(&file_sync_lock);
+    // if (list_empty(&thread_current()->open_files))
+    // {
+    //     lock_release(&file_sync_lock);
+    //     return;
+    // }
     struct open_file *file = get_file(fd);
     int actual_size;
     if (file != NULL)
@@ -350,12 +353,17 @@ tell(int fd)
 void close(int fd)
 {
     lock_acquire(&file_sync_lock);
+    if (list_empty(&thread_current()->open_files))
+    {
+        lock_release(&file_sync_lock);
+        return;
+    }
     struct open_file *file = get_file(fd);
     if (file != NULL)
     {
         file_close(file->file);
         list_remove(&file->elem);
-        file_allow_write(file);
+        // file_allow_write(file);
     }
     lock_release(&file_sync_lock);
     return;
