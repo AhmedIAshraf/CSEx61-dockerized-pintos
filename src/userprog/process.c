@@ -47,12 +47,13 @@ tid_t process_execute(const char *file_name)
   {
     palloc_free_page(fn_copy);
   }
-  else
-  {
-    // printf("parent waiting\n");
-    process_wait(tid);
-    // printf("parent wake up\n");
-  }
+  // else
+  // {
+  //   // printf("parent waiting\n");
+  //   // process_wait(tid);
+  //   // printf("parent wake up\n");
+  // }
+  // printf("tid = %d\n", tid);
   return tid;
 }
 
@@ -103,6 +104,7 @@ bool is_child_valid(tid_t pid)
   for (; c != list_end(&cur->children); c = list_next(c))
   {
     struct thread *child = list_entry(c, struct thread, child_elem);
+    // printf("curr child id = %d\n", child->tid);
     if (child->tid == pid)
       return true;
   }
@@ -132,8 +134,9 @@ get_child(tid_t pid)
    does nothing. */
 int process_wait(tid_t child_tid)
 {
-  // printf("Hello Wait\n");
-  if (is_child_valid(child_tid))
+  bool is_valid_child = is_child_valid(child_tid);
+  // printf("Hello Child %d, the parent is %d, is valid = %d\n", child_tid, thread_current()->tid, is_valid_child);
+  if (is_valid_child)
   {
     struct thread *parent = thread_current();
     parent->waiting_on_child_id = child_tid;
@@ -141,7 +144,7 @@ int process_wait(tid_t child_tid)
     list_remove(&child->child_elem);
     sema_up(&child->wait_child_sema);
     sema_down(&parent->wait_child_sema);
-    printf("wait child status = %d\n", parent->child_status);
+    // printf("wait child status = %d\n", parent->child_status);
     return parent->child_status;
   }
   return -1;
@@ -289,10 +292,10 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
   }
 
   // Print the arguments
-  for (int i = 0; i < argc; i++)
-  {
-    printf("%s\n", argv[i]);
-  }
+  // for (int i = 0; i < argc; i++)
+  // {
+  //   printf("%s\n", argv[i]);
+  // }
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
@@ -508,10 +511,10 @@ static bool setup_stack(void **esp, char *argv[])
   bool success = false;
   size_t arg_size;
 
-  for (int i = 0; i < argc; i++)
-  {
-    printf("%s\n", argv[i]);
-  }
+  // for (int i = 0; i < argc; i++)
+  // {
+  //   printf("%s\n", argv[i]);
+  // }
 
   // Calculate total argument size including null terminators
   arg_size = 0;
@@ -571,7 +574,7 @@ static bool setup_stack(void **esp, char *argv[])
 
   *esp -= sizeof(void *);
   memcpy(*esp, &z, sizeof(void *));
-  hex_dump((uintptr_t)*esp, *esp, PHYS_BASE - *esp, true);
+  // hex_dump((uintptr_t)*esp, *esp, PHYS_BASE - *esp, true);
   *((void **)(*esp)) = NULL;
 
 #if STACK_DEBUG

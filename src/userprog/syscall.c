@@ -27,6 +27,7 @@ int write(int, void *, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
+int wair(pid_t);
 
 void syscall_init(void)
 {
@@ -72,7 +73,7 @@ syscall_handler(struct intr_frame *f UNUSED)
         {
             exit(-1);
         }
-        process_wait(*(esp + 1));
+        f->eax = wait(*(esp + 1));
         break;
 
     case SYS_CREATE:
@@ -149,6 +150,12 @@ syscall_handler(struct intr_frame *f UNUSED)
     }
 }
 
+int
+wait(pid_t child_id) 
+{
+    process_wait(child_id);
+}
+
 void exit(int status)
 {
     struct thread *cur = thread_current();
@@ -179,11 +186,11 @@ void exit(int status)
     // printf("Start sema up\n");
     for (; c != list_end(&cur->children); c = list_next(c))
     {
-        printf("First Child waking up\n");
+        // printf("First Child waking up\n");
         struct thread *child = list_entry(c, struct thread, child_elem);
         sema_up(&child->wait_child_sema); // Wake up the children
     }
-    printf("Exit child status = %d\n", cur->child_status);
+    // printf("Exit child status = %d\n", parent->child_status);
     thread_exit();
     // printf("Finish exit\n");
 }
@@ -348,6 +355,7 @@ void close(int fd)
     {
         file_close(file->file);
         list_remove(&file->elem);
+        file_allow_write(file);
     }
     lock_release(&file_sync_lock);
     return;
