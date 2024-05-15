@@ -149,7 +149,7 @@ exit(int status) {
         parent->waiting_on_child_id = -1;
         sema_up(&parent->wait_child_sema);
     } else {
-        list_remove(&cur->elem);
+        list_remove(&cur->child_elem);
 
         struct list_elem *c = list_begin (&cur->wait_child_sema.waiters);
         for (; c != list_end (&cur->wait_child_sema.waiters); c = list_next (c)) {
