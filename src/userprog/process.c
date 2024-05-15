@@ -39,10 +39,17 @@ tid_t process_execute(const char *file_name)
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
+  // char* [] parsedName;
+  // char *token, *save_ptr;
+  // for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+  //   parsedName
+  // }
+
+  char *parsedName;
+  token = strtok_r(file_name, " ", &parsedName);
+
   tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
-  // printf("sema downing parent\n");
   sema_down(&thread_current()->wait_child_sema);
-  // printf("parent wake up\n");
   if (tid == TID_ERROR)
   {
     palloc_free_page(fn_copy);
