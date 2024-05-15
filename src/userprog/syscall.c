@@ -175,7 +175,7 @@ struct open_file *
 get_file (int fd) {
     struct open_file *file;
     if (list_empty(&thread_current()->open_files)) exit(-1);
-    struct list_elem *e = list_head(&thread_current()->open_files);
+    struct list_elem *e = list_begin(&thread_current()->open_files);
     struct open_file *temp_file = list_entry(e, struct open_file, elem);
     if (temp_file->fd == fd) file = temp_file;
     else {
