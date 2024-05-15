@@ -153,7 +153,7 @@ syscall_handler(struct intr_frame *f UNUSED)
 int
 wait(pid_t child_id) 
 {
-    process_wait(child_id);
+    return process_wait(child_id);
 }
 
 void exit(int status)
