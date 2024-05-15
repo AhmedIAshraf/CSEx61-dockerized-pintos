@@ -22,7 +22,7 @@ bool remove(const char *);
 int open(const char *);
 int filesize(int);
 int read(int, void *, unsigned);
-int write(int, void *, unsigned);
+int write(int,const void *, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
@@ -254,7 +254,7 @@ read (int fd, void *buffer, unsigned size) {
 }
 
 int
-write (int fd, void *buffer, unsigned size) {
+write (int fd,const void *buffer, unsigned size) {
     if (buffer == NULL) return -1;
     if (fd == 1) {
         putbuf((char *) buffer, size);
