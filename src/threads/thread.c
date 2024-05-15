@@ -201,6 +201,7 @@ thread_create (const char *name, int priority,
   struct thread *parent_thread = thread_current();
   t->parent = parent_thread;
   list_push_back(&parent_thread->children, &t->child_elem);
+  // printf("child inserted successfully & list size = %d\n", list_size(&parent_thread->children));
 
   /* Add to run queue. */
   thread_unblock (t);
