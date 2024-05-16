@@ -109,19 +109,19 @@ syscall_handler(struct intr_frame *f UNUSED)
         break;
 
     case SYS_READ:
-        if (!is_user_vaddr((void *)(esp + 1)) || !is_user_vaddr((void *)(esp + 2)) || !is_user_vaddr((void *)(esp + 3)))
+        if (!is_user_vaddr((void *)(esp + 1)) || !is_user_vaddr((void *)(*(esp + 2))) || !is_user_vaddr((void *)(esp + 3)))
         {
             exit(-1);
         }
-        f->eax = read(*(esp + 1), (void *)*(esp + 2), *(esp + 3));
+        f->eax = read(*(esp + 1), (void *)(*(esp + 2)), *(esp + 3));
         break;
 
     case SYS_WRITE:
-        if (!is_user_vaddr((void *)(esp + 1)) || !is_user_vaddr((void *)(esp + 2)) || !is_user_vaddr((void *)(esp + 3)))
+        if (!is_user_vaddr((void *)(esp + 1)) || !is_user_vaddr((void *)(*(esp + 2))) || !is_user_vaddr((void *)(esp + 3)))
         {
             exit(-1);
         }
-        f->eax = write(*(esp + 1), (void *)*(esp + 2), *(esp + 3));
+        f->eax = write(*(esp + 1), (void *)(*(esp + 2)), *(esp + 3));
         break;
 
     case SYS_SEEK:
