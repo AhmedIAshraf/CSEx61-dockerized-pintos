@@ -184,6 +184,9 @@ void exit(int status)
         struct thread *child = list_entry(c, struct thread, child_elem);
         sema_up(&child->wait_child_sema); // Wake up the children
     }
+    if(cur->executable){
+        file_allow_write(cur->executable);
+    }
     thread_exit();
 }
 
