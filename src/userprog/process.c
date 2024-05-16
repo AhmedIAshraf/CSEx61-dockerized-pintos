@@ -39,9 +39,10 @@ tid_t process_execute(const char *file_name)
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
-  token = strtok_r((char *)file_name, " ", &save_ptr);
-
-  tid = thread_create(token, PRI_DEFAULT, start_process, fn_copy);
+  char *new_file_name = malloc(strlen(file_name)+1);
+  strlcpy(new_file_name,file_name,strlen(file_name)+1);
+  new_file_name = strtok_r(new_file_name, " ", &save_ptr);
+  tid = thread_create(new_file_name, PRI_DEFAULT, start_process, fn_copy);
   sema_down(&thread_current()->wait_child_sema);
   if (tid == TID_ERROR)
   {
