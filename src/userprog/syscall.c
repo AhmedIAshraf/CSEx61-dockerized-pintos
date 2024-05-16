@@ -158,14 +158,13 @@ int wait(pid_t child_id)
 void exit(int status)
 {
     struct thread *cur = thread_current();
-    struct list_elem *e = list_begin(&cur->children);
+    struct list_elem *e = list_begin(&cur->open_files);
     printf("%s: exit(%d)\n", cur->name, status);
 
-    for (; e != list_end(&cur->children); e = list_next(e))
+    for (; e != list_end(&cur->open_files); e = list_next(e))
     {
         struct open_file *f = list_entry(e, struct open_file, elem);
         close(f->fd);
-        list_remove(&f->elem);
     }
 
     struct thread *parent = cur->parent;
@@ -202,26 +201,14 @@ pid_t exec(const char *file)
 struct open_file *
 get_file(int fd)
 {
-    struct open_file *file;
-    if (list_empty(&thread_current()->open_files))
-        exit(-1);
     struct list_elem *e = list_begin(&thread_current()->open_files);
-    struct open_file *temp_file = list_entry(e, struct open_file, elem);
-    if (temp_file->fd == fd)
-        file = temp_file;
-    else
-    {
-        while ((e = list_next(e)) != list_end(&thread_current()->open_files))
-        {
-            temp_file = list_entry(e, struct open_file, elem);
-            if (temp_file->fd == fd)
-            {
-                file = temp_file;
-                break;
-            }
-        }
+    
+    for (; e != list_end(&thread_current()->open_files); e = list_next(e)) {
+        struct open_file *file = list_entry(e, struct open_file, elem);
+        if (file->fd == fd)
+            return file;
     }
-    return file;
+    return NULL;
 }
 
 bool create(const char *file, unsigned initial_size)
@@ -255,7 +242,7 @@ int open(const char *file)
     {
         fd = thread_current()->file_descriptor;
         thread_current()->file_descriptor++;
-        struct open_file *temp;
+        struct open_file *temp = malloc(sizeof(struct open_file));
         temp->fd = fd;
         temp->file = opened;
         list_push_back(&thread_current()->open_files, &temp->elem);
@@ -346,17 +333,11 @@ tell(int fd)
 void close(int fd)
 {
     lock_acquire(&file_sync_lock);
-    if (list_empty(&thread_current()->open_files))
-    {
-        lock_release(&file_sync_lock);
-        return;
-    }
     struct open_file *file = get_file(fd);
     if (file != NULL)
     {
+        list_remove(&file->elem);
         file_close(file->file);
-        // list_remove(&file->elem);
     }
     lock_release(&file_sync_lock);
-    return;
 }
