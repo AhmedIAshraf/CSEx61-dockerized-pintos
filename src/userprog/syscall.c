@@ -287,7 +287,8 @@ int read(int fd, void *buffer, unsigned size)
 
 int write(int fd, void *buffer, unsigned size)
 {
-    if (buffer == NULL)
+    if(size == 0) return 0;
+    if (buffer == NULL || (!is_user_vaddr((void*)(*(int*)buffer+size))) && size == 0)
         return -1;
     if (fd == 1)
     {
