@@ -84,10 +84,10 @@ struct thread
    char name[16];             /* Name (for debugging purposes). */
    uint8_t *stack;            /* Saved stack pointer. */
    int priority;              /* Priority. */
-   int effictivePri;          // For Priority Donations
-   struct lock *waitingOn;
-   struct list locks;        // For locks the thread holds
-   struct list_elem allelem; /* List element for all threads list. */
+   int effictivePri;          /* Donated priority */
+   struct lock *waitingOn;    /* Lock which the thread is currently waiting on */
+   struct list locks;         /* List of locks that the thread holds */
+   struct list_elem allelem;  /* List element for all threads list. */
 
    // added by Hager Melook
    int nice;

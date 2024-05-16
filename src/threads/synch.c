@@ -177,7 +177,7 @@ void sema_up(struct semaphore *sema)
   }
   sema->value++;
   intr_set_level(old_level);
-  if (!thread_mlfqs) //    EDITED
+  if (!thread_mlfqs)
   {
     if (th != NULL && th->effictivePri > current->effictivePri)
     {
@@ -334,13 +334,10 @@ void lock_release(struct lock *lock)
 
     //      EDITED for multiple donation
     list_remove(&lock->elem);
-    /* we should here inherit the lock priority if there are another locks */
-
     if (!list_empty(&th->locks))
     {
       /* Get the next lock priority */
       struct lock *next_lock = list_entry(list_front(&th->locks), struct lock, elem);
-      th->effictivePri = next_lock->largestPri;
       th->effictivePri = next_lock->largestPri;
     }
     else

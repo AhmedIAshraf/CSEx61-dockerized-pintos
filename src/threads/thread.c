@@ -74,16 +74,6 @@ static void schedule(void);
 void thread_schedule_tail(struct thread *prev);
 static tid_t allocate_tid(void);
 
-/* Initializes the threading system by transforming the code
-   that's currently running into a thread.  This can't work in
-   general and it is possible in this case only because loader.S
-   was careful to put the bottom of the stack at a page boundary.
-   Also initializes the run queue and the tid lock.
-   After calling this function, be sure to initialize the page
-   allocator before trying to create any threads with
-   thread_create().
-   It is not safe to call thread_current() until this function
-   finishes. */
 
 static bool thread_max_priority(const struct list_elem *a,
                                 const struct list_elem *b,
@@ -97,6 +87,7 @@ static bool thread_max_original_priority(const struct list_elem *a,
                                          const struct list_elem *b,
                                          void *aux UNUSED);
 
+/* Gets the max donated thread priority */
 static bool
 thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -109,6 +100,7 @@ thread_max_priority(const struct list_elem *a, const struct list_elem *b, void *
   return t1->effictivePri > t2->effictivePri;
 }
 
+/* Gets the max lock priority */
 static bool
 locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -120,6 +112,7 @@ locks_max_priority(const struct list_elem *a, const struct list_elem *b, void *a
   return l1->largestPri > l2->largestPri;
 }
 
+/* Gets the maximum priority */
 static bool
 thread_max_original_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -131,6 +124,16 @@ thread_max_original_priority(const struct list_elem *a, const struct list_elem *
   return th1->priority > th2->priority;
 }
 
+/* Initializes the threading system by transforming the code
+   that's currently running into a thread.  This can't work in
+   general and it is possible in this case only because loader.S
+   was careful to put the bottom of the stack at a page boundary.
+   Also initializes the run queue and the tid lock.
+   After calling this function, be sure to initialize the page
+   allocator before trying to create any threads with
+   thread_create().
+   It is not safe to call thread_current() until this function
+   finishes. */
 void thread_init(void)
 {
   ASSERT(intr_get_level() == INTR_OFF);
@@ -250,7 +253,7 @@ tid_t thread_create(const char *name, int priority,
     calculate_priority(t, NULL);
   }
 
-  if (priority > thread_current()->effictivePri)
+  if (priority > thread_current()->effictivePri)  // if the priority of the thread greater than the current thread -> yield
   {
     thread_yield();
   }
@@ -300,8 +303,9 @@ void thread_unblock(struct thread *t)
     list_insert_ordered(&ready_list, &t->elem, thread_max_original_priority, NULL);
   }
   else
+  {
     list_insert_ordered(&ready_list, &t->elem, thread_max_priority, NULL);
-  
+  }
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -371,9 +375,13 @@ void thread_yield(void)
   if (cur != idle_thread)
     // modified by Hager Melook
     if (thread_mlfqs)
+    {
       list_insert_ordered(&ready_list, &cur->elem, thread_max_original_priority, NULL);
+    } 
     else
+    {
       list_insert_ordered(&ready_list, &cur->elem, thread_max_priority, NULL);
+    }
   // list_push_back(&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule();
@@ -389,7 +397,7 @@ void thread_foreach(thread_action_func *func, void *aux)
   ASSERT(intr_get_level() == INTR_OFF);
 
   for (e = list_begin(&all_list); e != list_end(&all_list);
-       e = list_next(e))
+      e = list_next(e))
   {
     struct thread *t = list_entry(e, struct thread, allelem);
     func(t, aux);
