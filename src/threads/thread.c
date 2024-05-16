@@ -485,7 +485,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->wait_child_sema, 0);
   t->child_status = -1;
   t->waiting_on_child_id = -1;
-
+  t->executable = NULL;
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
