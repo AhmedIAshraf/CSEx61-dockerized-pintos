@@ -201,15 +201,6 @@ thread_create (const char *name, int priority,
   struct thread *parent_thread = thread_current();
   t->parent = parent_thread;
   list_push_back(&parent_thread->children, &t->child_elem);
-
-  // printf("\nChildren of parent %s %d\n", parent_thread->name, parent_thread->tid);
-  // struct list_elem *c = list_begin(&parent_thread->children);
-  // for (; c != list_end(&parent_thread->children); c = list_next(c))
-  // {
-  //   struct thread *child = list_entry(c, struct thread, child_elem);
-  //   printf("Child %s %d\n", child->name, child->tid);
-  // }
-  // printf("\n");
   /* Add to run queue. */
   thread_unblock (t);
 

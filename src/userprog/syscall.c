@@ -38,7 +38,6 @@ void syscall_init(void)
 static void
 syscall_handler(struct intr_frame *f UNUSED)
 {
-    //    printf("system call!\n");
     esp = f->esp;
     if (!is_user_vaddr((void *)(esp)))
     {
@@ -160,7 +159,7 @@ void exit(int status)
     struct thread *cur = thread_current();
     struct list_elem *e = list_begin(&cur->open_files);
     printf("%s: exit(%d)\n", cur->name, status);
-
+    /* Remove all files */
     for (; e != list_end(&cur->open_files); e = list_next(e))
     {
         struct open_file *f = list_entry(e, struct open_file, elem);
@@ -184,6 +183,7 @@ void exit(int status)
         struct thread *child = list_entry(c, struct thread, child_elem);
         sema_up(&child->wait_child_sema); // Wake up the children
     }
+
     if(cur->executable){
         file_allow_write(cur->executable);
     }

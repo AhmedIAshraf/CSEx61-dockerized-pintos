@@ -115,7 +115,7 @@ struct thread
     tid_t waiting_on_child_id;          /* Child's -that the parent is waiting on- id */
     struct semaphore wait_child_sema;   /* Semaphore which the parent waits on while waiting the child */
     struct list_elem child_elem;
-    struct file *executable;
+    struct file *executable;            /* Loaded executable file */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;
                     /* List element. */
@@ -127,7 +127,7 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-  };
+};
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

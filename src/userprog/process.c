@@ -48,13 +48,6 @@ tid_t process_execute(const char *file_name)
   {
     palloc_free_page(fn_copy);
   }
-  // else
-  // {
-  //   // printf("parent waiting\n");
-  //   // process_wait(tid);
-  //   // printf("parent wake up\n");
-  // }
-  // printf("tid = %d\n", tid);
   return tid;
 }
 
@@ -136,7 +129,6 @@ get_child(tid_t pid)
 int process_wait(tid_t child_tid)
 {
   bool is_valid_child = is_child_valid(child_tid);
-  // printf("Hello Child %d, the parent is %d, is valid = %d\n", child_tid, thread_current()->tid, is_valid_child);
   if (is_valid_child)
   {
     struct thread *parent = thread_current();
@@ -145,7 +137,6 @@ int process_wait(tid_t child_tid)
     list_remove(&child->child_elem);
     sema_up(&child->wait_child_sema);
     sema_down(&parent->wait_child_sema);
-    // printf("wait child status = %d\n", parent->child_status);
     return parent->child_status;
   }
   return -1;
@@ -294,12 +285,6 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   strlcpy(&thread_current()->name, argv[0], sizeof thread_current()->name);
 
-  // Print the arguments
-  // for (int i = 0; i < argc; i++)
-  // {
-  //   printf("%s\n", argv[i]);
-  // }
-
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
   if (t->pagedir == NULL)
@@ -385,15 +370,12 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
 
   /* Start address. */
   *eip = (void (*)(void))ehdr.e_entry;
- file_deny_write(file);
- thread_current()->executable = file;
+  file_deny_write(file);
+  thread_current()->executable = file;
   success = true;
 
 done:
-  // TODO
-  
   /* We arrive here whether the load is successful or not. */
-  // file_close(file);
   return success;
 }
 
