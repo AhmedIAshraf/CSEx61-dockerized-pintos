@@ -39,7 +39,6 @@ tid_t process_execute(const char *file_name)
     return TID_ERROR;
   strlcpy(fn_copy, file_name, PGSIZE);
 
-  // char *parsedName;
   token = strtok_r((char *)file_name, " ", &save_ptr);
 
   tid = thread_create(token, PRI_DEFAULT, start_process, fn_copy);
@@ -291,6 +290,8 @@ bool load(const char *file_name, void (**eip)(void), void **esp)
     argv[argc] = token;
     argc++;
   }
+
+  strlcpy(&thread_current()->name, argv[0], sizeof thread_current()->name);
 
   // Print the arguments
   // for (int i = 0; i < argc; i++)
